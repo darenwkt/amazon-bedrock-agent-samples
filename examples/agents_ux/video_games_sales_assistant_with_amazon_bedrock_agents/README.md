@@ -8,7 +8,7 @@
 > [!IMPORTANT]
 > **🚀 Ready-to-Deploy Agent Web Application**: Use this reference solution to build other agent-powered web applications across different industries. Extend the agent capabilities by adding custom tools for specific industry workflows and adapt it to various business domains.
 
-This solution provides a Generative AI application reference that allows users to interact with data through a natural language interface. The solution connects **[Amazon Bedrock Agents](https://aws.amazon.com/bedrock/agents/)** to a PostgreSQL database, providing data analysis capabilities through a Web Application interface.
+This solution provides a Generative AI application reference that allows users to interact with data through a natural language interface. The solution uses **[Amazon Bedrock Agents](https://aws.amazon.com/bedrock/agents/)** connected to a PostgreSQL database for data analysis capabilities, deployed with **[AWS CDK](https://docs.aws.amazon.com/cdk/v2/guide/home.html)** for back-end infrastructure and **[AWS Amplify](https://docs.amplify.aws/)** for the front-end web application.
 
 <div align="center">
 <img src="./images/data-analyst-assistant-amazon-bedrock-agents.gif" alt="Conversational Data Analyst Assistant Solution with Amazon Bedrock Agents">
@@ -39,24 +39,28 @@ The following architecture diagram illustrates a reference solution for a genera
 
 > [!IMPORTANT]
 > This sample application is meant for demo purposes and is not production ready. Please make sure to validate the code with your organizations security best practices.
-> 
-> Cost Alert: This solution will cost approximately $180 USD per month, mainly for Aurora Serverless and RDS Proxy, plus the usage of on-demand services like Amazon Bedrock and Lambda functions. Please ensure you understand these costs before deployment.
 
-The solution deploys the following AWS services:
+### CDK Infrastructure Deployment
 
-- **Amazon Bedrock Agent**: Powers the ***Data Analyst Assistant*** that answers questions by generating SQL queries using Claude 3.5 Haiku
+The AWS CDK stack deploys and configures the following managed services:
+
+- **Amazon Bedrock Agent**: Powers the ***Data Analyst Assistant*** that answers questions by generating SQL queries using Claude Haiku 4.5
 - **AWS Lambda**: Processes agent requests through various tools including:
-    - /runSQLQuery: Executes queries against the database
+    - /runSQLQuery: Executes queries against the database via the RDS Data API
     - /getCurrentDate: Retrieves the current date
     - /getTablesInformation: Provides database tables information for agent context
-- **Aurora Serverless PostgreSQL**: Stores the video game sales data
+- **Amazon Aurora Serverless v2 PostgreSQL**: Stores the video game sales data with RDS Data API integration
 - **Amazon DynamoDB**: Tracks questions and query results
-- **AWS Secrets Manager**: Securely stores database credentials
-- **Amazon VPC**: Provides network isolation for the database
+- **AWS Secrets Manager**: Securely stores database credentials (admin and read-only user)
+- **Amazon VPC**: Provides network isolation for the database with public and private subnets
+- **Amazon S3**: Import bucket for loading data into Aurora PostgreSQL
+
+### Amplify Deployment for the Front-End Application
+
 - **React Web Application**: Delivers the user interface for the assistant
     - Uses Amazon Cognito for user authentication and permissions management
     - The application invokes the Amazon Bedrock Agent for interacting with the assistant
-    - For chart generation, the application directly invokes the Claude 3.7 Sonnet model
+    - For chart generation, the application directly invokes the Claude Haiku 4.5 model
 
 > [!NOTE]
 > The React Web Application uses Amazon Cognito for user authentication and permissions management, providing secure access to Amazon Bedrock and Amazon DynamoDB services through authenticated user roles.
@@ -70,17 +74,17 @@ The solution deploys the following AWS services:
 The **user interaction workflow** operates as follows:
 
 - The web application sends user business questions to the Amazon Bedrock Agent
-- The agent (powered by Claude 3.5 Haiku) processes natural language and determines when to execute database queries
-- Lambda functions execute SQL queries against the Aurora PostgreSQL database and send the results back to the agent, which formulates an answer to the question
+- The agent (powered by Claude Haiku 4.5) processes natural language and determines when to execute database queries
+- Lambda functions execute SQL queries against the Aurora PostgreSQL database via the RDS Data API and send the results back to the agent, which formulates an answer to the question
 - After the agent's response is received by the web application, the raw data query results are retrieved from the DynamoDB table to display both the answer and the corresponding records
-- For chart generation, the application invokes a model (powered by Claude 3.7 Sonnet) to analyze the agent's answer and raw data query results to generate the necessary data to render an appropriate chart visualization
+- For chart generation, the application invokes a model (powered by Claude Haiku 4.5) to analyze the agent's answer and raw data query results to generate the necessary data to render an appropriate chart visualization
 
 ## Deployment Instructions
 
 The deployment consists of two main steps:
 
-1. **Generative AI Application** - [Data Source and Amazon Bedrock Agent Deployment with AWS SAM](./sam-bedrock-video-games-sales-assistant/)
-2. **Front-End Implementation** - [Integrating Amazon Bedrock Agent with a Ready-to-Use Data Analyst Assistant Application](./amplify-video-games-sales-assistant-bedrock-agent/)
+1. **Generative AI Application** - [Data Source and Amazon Bedrock Agent Deployment with AWS CDK](./cdk-video-games-sales-assistant-bedrock-agent/)
+2. **Front-End Implementation** - [Deploying a Conversational Data Analyst Assistant Solution with Amazon Bedrock Agents](./amplify-video-games-sales-assistant-bedrock-agent/)
 
 > [!NOTE]
 > *It is recommended to use the Oregon (us-west-2) or N. Virginia (us-east-1) regions to deploy the application.*

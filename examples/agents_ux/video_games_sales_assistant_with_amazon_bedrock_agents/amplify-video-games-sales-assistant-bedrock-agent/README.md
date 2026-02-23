@@ -1,10 +1,13 @@
 # Front-End Implementation - Integrating Amazon Bedrock Agent with a Ready-to-Use Data Analyst Assistant Application
 
-This tutorial guides you through setting up a React Web application that integrates with your Amazon Bedrock Agent, creating a Data Analyst Assistant for Video Game Sales.
+This tutorial guides you through setting up a React Web application using **[AWS Amplify](https://docs.amplify.aws/)** that integrates with your **[Amazon Bedrock Agent](https://aws.amazon.com/bedrock/agents/)** deployment, creating a Data Analyst Assistant for Video Game Sales.
+
+> [!NOTE]
+> **Working Directory**: Make sure you are in the `amplify-video-games-sales-assistant-bedrock-agent/` folder before starting this tutorial. All commands in this guide should be executed from this directory.
 
 ## Overview
 
-By the end of this tutorial, you'll have a fully functional Generative AI web application that allows users to interact with a Data Analyst Assistant interface.
+By the end of this tutorial, you'll have a fully functional Generative AI web application that allows users to interact with a Data Analyst Assistant interface powered by Amazon Bedrock Agents.
 
 The application consists of two main components:
 
@@ -12,7 +15,7 @@ The application consists of two main components:
 - **Amazon Bedrock Integration:**:
     - Uses your Bedrock Agent for data analysis and natural language processing
     - The application invokes the Amazon Bedrock Agent for interacting with the assistant
-    - Directly invokes Claude 3.7 Sonnet model for chart generation and visualization
+    - Directly invokes Claude Haiku 4.5 model for chart generation and visualization
 
 > [!IMPORTANT]
 > This sample application is for demonstration purposes only and is not production-ready. Please validate the code against your organization's security best practices.
@@ -22,10 +25,6 @@ The application consists of two main components:
 Before you begin, ensure you have:
 
 - [Node.js version 18+](https://nodejs.org/en/download/package-manager)
-- React Scripts installed:
-``` bash
-npm install react-scripts
-```
 
 ## Set Up the Front-End Application
 
@@ -39,7 +38,7 @@ npm install
 
 ### Install Amplify CLI
 
-Install the Amplify CLI globally:
+Install the **[AWS Amplify](https://docs.amplify.aws/)** CLI globally:
 
 ``` bash
 npm install -g @aws-amplify/cli
@@ -52,6 +51,9 @@ Initialize the Amplify project:
 ``` bash
 amplify init
 ```
+
+- Do you want to continue with Amplify Gen 1? **`yes`**
+- Why would you like to use Amplify Gen 1? **`Prefer not to answer`**
 
 Use the following configuration:
 
@@ -98,12 +100,51 @@ amplify push
 > [!NOTE]
 > This creates a Cognito User Pool and Identity Pool in your AWS account for user authentication. AWS credentials for the Front-End Application are automatically managed through Cognito.
 
+## Get CDK Output Values
+
+Get the required values from your CDK project outputs. These values are needed for configuring AuthRole permissions and environment variables:
+
+``` bash
+# Set the stack name environment variable
+export STACK_NAME=CdkVideoGamesSalesAssistantBedrockAgentStack
+
+# Get the values from CDK outputs
+export AGENT_ARN=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='AgentARN'].OutputValue" --output text)
+export AGENT_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='AgentId'].OutputValue" --output text)
+export QUESTION_ANSWERS_TABLE_NAME=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='QuestionAnswersTableName'].OutputValue" --output text)
+export QUESTION_ANSWERS_TABLE_ARN=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='QuestionAnswersTableArn'].OutputValue" --output text)
+export ACCOUNT_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='AccountId'].OutputValue" --output text)
+
+cat << EOF
+# Agent Resources
+AGENT_ARN: ${AGENT_ARN}
+AGENT_ID: ${AGENT_ID}
+ACCOUNT_ID: ${ACCOUNT_ID}
+
+# DynamoDB Resources
+QUESTION_ANSWERS_TABLE_NAME: ${QUESTION_ANSWERS_TABLE_NAME}
+QUESTION_ANSWERS_TABLE_ARN: ${QUESTION_ANSWERS_TABLE_ARN}
+EOF
+```
+
 ## Configure AuthRole Permissions
 
 After authentication deployment, you need to grant your authenticated users permission to access AWS services.
 
-1. **Find your AuthRole**: Go to AWS Console → IAM → Roles → Search for amplify-daabedrockagent-dev-*-authRole
-2. **Add this policy** (replace the placeholder values with your actual values from SAM outputs):
+1. **Find your AuthRole**: Go to AWS Console → IAM → Roles → Search for `amplify-daabedrockagent-dev-*-authRole`
+
+2. **Add an inline policy**: Click on the role → **Add permissions** → **Create inline policy** → Select **JSON** tab
+
+3. **Copy the policy below** and replace the following placeholders with your actual values:
+
+   | Placeholder | Replace With | Example |
+   |-------------|--------------|---------|
+   | `<account_id>` | Your AWS Account ID (12-digit number) | `123456789012` |
+   | `<agent_arn>` | `AGENT_ARN` from CDK outputs above | `arn:aws:bedrock:us-east-1:123456789012:agent/XXXXXXXXXX` |
+   | `<agent_id>` | `AGENT_ID` from CDK outputs above | `XXXXXXXXXX` |
+   | `<question_answers_table_arn>` | `QUESTION_ANSWERS_TABLE_ARN` from CDK outputs above | `arn:aws:dynamodb:us-east-1:123456789012:table/QuestionAnswers-xxx` |
+
+**Policy to copy (replace placeholders):**
 
 ``` json
 {
@@ -127,10 +168,12 @@ After authentication deployment, you need to grant your authenticated users perm
                 "bedrock:InvokeModel"
             ],
             "Resource": [
-                "arn:aws:bedrock:*:<account_id>:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-                "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0",
-                "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0",
-                "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0"
+                "arn:aws:bedrock:us-east-1:<account_id>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "arn:aws:bedrock:us-east-2:<account_id>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "arn:aws:bedrock:us-west-2:<account_id>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+                "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+                "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
             ]
         },
         {
@@ -145,6 +188,8 @@ After authentication deployment, you need to grant your authenticated users perm
 }
 ```
 
+4. **Save the policy** with a name like `DataAnalystAssistantPermissions`
+
 ## Configure Environment Variables
 
 Rename the file **src/sample.env.js** to **src/env.js**:
@@ -153,15 +198,17 @@ Rename the file **src/sample.env.js** to **src/env.js**:
 mv src/sample.env.js src/env.js
 ```
 
-In you **src/env.js** update the following environment variables
+In your **src/env.js** update the following environment variables using the CDK output values from above:
 
- - AWS Region:
-     - **AWS_REGION**
+- **AWS_REGION**: Your AWS region (e.g., `us-east-1`)
+- **AGENT_ID**: Your Bedrock Agent ID from CDK outputs
+- **AGENT_ALIAS_ID**: Your Bedrock Agent Alias ID (create an alias in the Bedrock console)
+- **QUESTION_ANSWERS_TABLE_NAME**: Use the value from the CDK outputs above
 
- - Agent and DynamoDB table name information that you can find in the CloudFormation Outputs from the SAM project:
-     - **AGENT_ID**
-     - **AGENT_ALIAS_ID**
-     - **QUESTION_ANSWERS_TABLE_NAME** 
+Also, you can update the general application description:
+- **APP_NAME**: "Data Analyst Assistant"
+- **APP_SUBJECT**: "Video Games Sales"
+- **WELCOME_MESSAGE**: Your custom welcome message
 
 ## Test Your Data Analyst Assistant
 
@@ -230,7 +277,7 @@ Give me a short summary and conclusion of our conversation.
 
 ## Deploy your Application with Amplify Hosting
 
-To deploy your application yu can use AWS Amplify Hosting:
+To deploy your application you can use AWS Amplify Hosting:
 
 ### Add Hosting
 
